@@ -15,14 +15,17 @@ public class Rocket : MonoBehaviour
     [SerializeField] AudioClip mainEngine = null;
     [SerializeField] AudioClip nextLevel = null;
     [SerializeField] AudioClip crash = null;
+    [SerializeField] float levelLoadDelay = 2f;
 
     [SerializeField] ParticleSystem winEffect = null;
     [SerializeField] ParticleSystem crashEffect = null;
     [SerializeField] ParticleSystem flameEffect = null;
 
     enum State { Alive, Dying, Transcending};
+    enum DebugCollision { On, Off};
+
     State state = State.Alive;
-    int finalScene = 1;
+    DebugCollision useCollision = DebugCollision.On;
 
     // Start is called before the first frame update
     void Start()
@@ -41,11 +44,17 @@ public class Rocket : MonoBehaviour
         }
         MovementOnInput();
         SoundsOnInput();
+        DebugOnInput();
     }
 
     private void OnCollisionEnter(Collision collision)
     {
         if (state != State.Alive)
+        {
+            return;
+        }
+
+        if (useCollision == DebugCollision.Off)
         {
             return;
         }
@@ -66,19 +75,37 @@ public class Rocket : MonoBehaviour
         }
     }
 
+    private void DebugOnInput()
+    {
+        if (!Debug.isDebugBuild)
+        {
+            return;
+        }
+        if (Input.GetKeyDown(KeyCode.L))
+        {
+            Finish();
+        }
+        if (Input.GetKeyDown(KeyCode.C))
+        {
+            useCollision = useCollision == DebugCollision.On ? DebugCollision.Off : DebugCollision.On;
+        }
+    }
+
     private void Finish()
     {
         state = State.Transcending;
+        rocketSound.Stop();
+        flameEffect.Stop();
         rocketSound.PlayOneShot(nextLevel);
         rocketSound.loop = false;
-        Invoke("LoadNextScene", 1f);
+        Invoke("LoadNextScene", levelLoadDelay);
     }
 
     private void Die()
     {
-        print("Dead");
         state = State.Transcending;
-        Invoke("LoadFirstScene", 1f);
+        flameEffect.Stop();
+        Invoke("LoadFirstScene", levelLoadDelay);
         rocketSound.Stop();
         rocketSound.PlayOneShot(crash);
         crashEffect.Play();
@@ -93,18 +120,15 @@ public class Rocket : MonoBehaviour
 
     private void LoadNextScene()
     {
+        print(SceneManager.sceneCountInBuildSettings);
         Scene activeScene = SceneManager.GetActiveScene();
         int currentIndex = activeScene != null ? activeScene.buildIndex : 0;
-        int nextIndex = currentIndex + 1;
-        if (nextIndex > finalScene)
+        int nextIndex = currentIndex + 1 % SceneManager.sceneCountInBuildSettings;
+        if (currentIndex + 1 == SceneManager.sceneCountInBuildSettings)
         {
-            print("Win!!!");
             winEffect.Play();
         }
-        else
-        {
-            SceneManager.LoadScene(nextIndex);
-        }
+        SceneManager.LoadScene(nextIndex);
         state = State.Alive;
     }
 
