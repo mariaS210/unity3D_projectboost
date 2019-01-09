@@ -23,15 +23,17 @@ public class Rocket : MonoBehaviour
 
     enum State { Alive, Dying, Transcending};
     enum DebugCollision { On, Off};
+    const string friendly = "Friendly";
+    const string finish = "Finish";
 
     State state = State.Alive;
     DebugCollision useCollision = DebugCollision.On;
+    Time time;
 
     // Start is called before the first frame update
     void Start()
     {
         rigidBody = GetComponent<Rigidbody>();
-        rigidBody.mass = 1;
         rocketSound = GetComponent<AudioSource>();
     }
 
@@ -59,12 +61,9 @@ public class Rocket : MonoBehaviour
             return;
         }
 
-        const string friendly = "Friendly";
-        const string finish = "Finish";
         switch (collision.gameObject.tag)
         {
             case friendly:
-                print("OK");
                 break;
             case finish:
                 Finish();
@@ -94,22 +93,22 @@ public class Rocket : MonoBehaviour
     private void Finish()
     {
         state = State.Transcending;
-        rocketSound.Stop();
+        useCollision = DebugCollision.Off;
+        //StopWithFadeOut();
         flameEffect.Stop();
-        rocketSound.PlayOneShot(nextLevel);
-        rocketSound.loop = false;
+        PlayWithFadeIn(nextLevel, false);
         Invoke("LoadNextScene", levelLoadDelay);
     }
 
     private void Die()
     {
         state = State.Transcending;
+        useCollision = DebugCollision.Off;
         flameEffect.Stop();
         Invoke("LoadFirstScene", levelLoadDelay);
-        rocketSound.Stop();
-        rocketSound.PlayOneShot(crash);
+        //StopWithFadeOut();
+        PlayWithFadeIn(crash, false);
         crashEffect.Play();
-        rocketSound.loop = false;
     }
 
     private void LoadFirstScene()
@@ -120,10 +119,9 @@ public class Rocket : MonoBehaviour
 
     private void LoadNextScene()
     {
-        print(SceneManager.sceneCountInBuildSettings);
         Scene activeScene = SceneManager.GetActiveScene();
         int currentIndex = activeScene != null ? activeScene.buildIndex : 0;
-        int nextIndex = currentIndex + 1 % SceneManager.sceneCountInBuildSettings;
+        int nextIndex = (currentIndex + 1) % SceneManager.sceneCountInBuildSettings;
         if (currentIndex + 1 == SceneManager.sceneCountInBuildSettings)
         {
             winEffect.Play();
@@ -140,18 +138,23 @@ public class Rocket : MonoBehaviour
             rigidBody.AddRelativeForce(Vector3.up * thrustThisFrame);
             flameEffect.Play();
         }
-
-        // take manual control of rotation
-        rigidBody.freezeRotation = true;
+        
         float rotationThisFrame = rcsThrust * Time.deltaTime;
         if (Input.GetKey(KeyCode.A))
         {
-            transform.Rotate(Vector3.forward * rotationThisFrame);
+            RotateNoPhysics(rotationThisFrame);
         }
         else if (Input.GetKey(KeyCode.D))
         {
-            transform.Rotate(-Vector3.forward * rotationThisFrame);
+            RotateNoPhysics(-rotationThisFrame);
         }
+    }
+
+    private void RotateNoPhysics(float rotationThisFrame)
+    {
+        // take manual control of rotation
+        rigidBody.freezeRotation = true;
+        transform.Rotate(Vector3.forward * rotationThisFrame);
         // resume physics control of rotation
         rigidBody.freezeRotation = false;
     }
@@ -160,13 +163,35 @@ public class Rocket : MonoBehaviour
     {
         if (Input.GetKeyDown(KeyCode.Space))
         {
-            rocketSound.PlayOneShot(mainEngine);
-            rocketSound.loop = true;
+            PlayWithFadeIn(mainEngine);   
         }
         else if (Input.GetKeyUp(KeyCode.Space))
         {
-            rocketSound.Stop();
+            StopWithFadeOut();
             flameEffect.Stop();
         }
+    }
+
+    private void PlayWithFadeIn(AudioClip sound, bool loop=true)
+    {
+        //if (!rocketSound.isPlaying)
+        //{
+            //rocketSound.FadeOut(1f);
+            rocketSound.clip = sound;
+            rocketSound.loop = loop;
+            rocketSound.volume = 1f;
+            //rocketSound.FadeIn(2f);
+            rocketSound.Play();
+        //}
+    }
+
+    private void StopWithFadeOut()
+    {
+        //if (rocketSound.isPlaying)
+        //{
+            rocketSound.FadeOut(0.1f);
+            //rocketSound.Stop();
+            rocketSound.loop = false;
+        //}
     }
 }
